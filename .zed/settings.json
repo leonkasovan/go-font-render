@@ -8,7 +8,7 @@
 			"program": "sh"
 		},
 		"env": {
-			"PATH": "F:\\w64devkit\\bin;F:\\go-go1.25.4\\bin"
+			"PATH": "D:\\w64devkit\\bin;D:\\go-go1.25.4\\bin"
 		}
 	}
 }
