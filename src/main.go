@@ -193,6 +193,7 @@ type BatchTextRenderer struct {
 	vertices    []float32
 	maxVertices int
 	colorLoc    int32
+	drawCalls   int // Added: counter for draw calls per flush
 }
 
 func NewBatchTextRenderer(prog, vao, vbo uint32, glyphs map[rune]*Glyph, atlas *GLAtlas, colorLoc int32) *BatchTextRenderer {
@@ -204,9 +205,10 @@ func (b *BatchTextRenderer) Draw(text string, x, y int, c ColorKey) {
 	b.commands = append(b.commands, TextCommand{Text: text, X: x, Y: y, C: c})
 }
 
-func (b *BatchTextRenderer) Flush(face font.Face) {
+func (b *BatchTextRenderer) Flush(face font.Face) int {
+	b.drawCalls = 0 // Reset draw call counter at start of flush
 	if len(b.commands) == 0 {
-		return
+		return 0
 	}
 	// group by color
 	groups := make(map[ColorKey][]TextCommand)
@@ -285,9 +287,11 @@ func (b *BatchTextRenderer) Flush(face font.Face) {
 		gl.Uniform3f(b.colorLoc, k.R, k.G, k.B)
 		count := int32(len(b.vertices) / 4)
 		gl.DrawArrays(gl.TRIANGLES, 0, count)
+		b.drawCalls++ // Count each color group as one draw call
 	}
 	gl.BindVertexArray(0)
 	b.commands = b.commands[:0]
+	return b.drawCalls
 }
 
 const vertexSrc = `#version 330 core
@@ -530,13 +534,18 @@ func main() {
 		batch.Draw("0123456789", 50, 210, ColorKey{0.3, 0.9, 0.3})
 		batch.Draw("abcdefghijklmnopqrstuvwxyz", 50, 270, ColorKey{0.9, 0.9, 0.3})
 		batch.Draw("Waving Text!", 300+int(wave), 350, ColorKey{1.0, float32(pulse * 0.8), 0.2})
-		for i := 0; i < 5; i++ {
+		for i := 0; i < 8; i++ {
 			y := 420 + i*20
 			col := ColorKey{float32(0.5 + 0.5*math.Sin(elapsed+float64(i)*0.5)), float32(0.5 + 0.5*math.Sin(elapsed+float64(i)*0.5+2.0)), float32(0.5 + 0.5*math.Sin(elapsed+float64(i)*0.5+4.0))}
 			batch.Draw(fmt.Sprintf("Performance line %d: ABCDEFGHIJKLMNOPQRSTUVWXYZ", i), 50, y, col)
 		}
 
-		batch.Flush(face)
+		drawCalls := batch.Flush(face) // Get draw calls count for this frame
+
+		// Draw the draw calls info on screen
+		batch.Draw(fmt.Sprintf("Draw Calls: %d", drawCalls), 50, 150, ColorKey{0.9, 0.5, 0.9})
+		batch.Flush(face) // Flush the draw calls info text
+
 		win.SwapBuffers()
 		frame++
 	}
